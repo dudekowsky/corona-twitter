@@ -6,4 +6,4 @@ cd into base folder, run
 ```bash
 python3 -m http.server
 ```
-and go to [localhost:8000]
+and go to [localhost:8000](localhost:8000)
