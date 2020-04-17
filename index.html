@@ -3,13 +3,17 @@
 <svg id='viz'></svg>
 </body>
 
-<script src='https://d3js.org/d3.v5.min.js'></script>
+<script src='./assets/d3.v5.min.js'></script>
 <script>
 var width = 800;
 var height = 600;
 var color = d3.scaleOrdinal(d3.schemeCategory10);
+const simulationDurationInMs = 20000; // 20 seconds
 
-d3.json("networkx_small_graph_data.json").then(function(graph) {
+let startTime = Date.now();
+let endTime = startTime + simulationDurationInMs;
+
+d3.json("networkx_graph_data.json").then(function(graph) {
 
 var label = {
     'nodes': [],
@@ -34,7 +38,15 @@ var graphLayout = d3.forceSimulation(graph.nodes)
     .force("center", d3.forceCenter(width / 2, height / 2))
     .force("x", d3.forceX(width / 2).strength(1))
     .force("y", d3.forceY(height / 2).strength(1))
-    .force("link", d3.forceLink(graph.links).id(function(d) {return d.id; }).distance(50).strength(1))
+    .force("link", d3.forceLink(graph.links).id(function(d) {
+        return d.id; }).distance(50).
+        strength((link) => {
+            return link.weight / 1000000;
+
+        }))
+    .force("collide", d3.forceCollide().radius((node) => { 
+        return 1 + node.size / 100000; 
+    }).strength(1))
     .on("tick", ticked);
 
 var adjlist = [];
@@ -99,31 +111,35 @@ var labelNode = container.append("g").attr("class", "labelNodes")
 node.on("mouseover", focus).on("mouseout", unfocus);
 
 function ticked() {
+    if (Date.now() < endTime) {
+        node.call(updateNode);
+        link.call(updateLink);
 
-    node.call(updateNode);
-    link.call(updateLink);
+        labelLayout.alphaTarget(0.3).restart();
+        labelNode.each(function(d, i) {
+            if(i % 2 == 0) {
+                d.x = d.node.x;
+                d.y = d.node.y;
+            } else {
+                var b = this.getBBox();
 
-    labelLayout.alphaTarget(0.3).restart();
-    labelNode.each(function(d, i) {
-        if(i % 2 == 0) {
-            d.x = d.node.x;
-            d.y = d.node.y;
-        } else {
-            var b = this.getBBox();
+                var diffX = d.x - d.node.x;
+                var diffY = d.y - d.node.y;
 
-            var diffX = d.x - d.node.x;
-            var diffY = d.y - d.node.y;
+                var dist = Math.sqrt(diffX * diffX + diffY * diffY);
 
-            var dist = Math.sqrt(diffX * diffX + diffY * diffY);
-
-            var shiftX = b.width * (diffX - dist) / (dist * 2);
-            shiftX = Math.max(-b.width, Math.min(0, shiftX));
-            var shiftY = 16;
-            this.setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
-        }
-    });
-    labelNode.call(updateNode);
-
+                var shiftX = b.width * (diffX - dist) / (dist * 2);
+                shiftX = Math.max(-b.width, Math.min(0, shiftX));
+                var shiftY = 16;
+                this.setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
+            }
+        });
+        labelNode.call(updateNode);
+    } else
+    {
+        graphLayout.stop()
+        labelLayout.stop()
+    }
 }
 
 function fixna(x) {
